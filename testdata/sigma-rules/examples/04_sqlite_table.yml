@@ -1,0 +1,18 @@
+# Demo rule: SQLite dumps flatten to one log entry per row with sqlite_db_path, sqlite_table, event_type sqlite_row.
+title: Example - SQLite table name match (e.g. TCC)
+id: sdx-example-sqlite-table
+status: experimental
+description: Matches exported SQLite rows; table and DB path are attached for correlation.
+logsource:
+  product: ios
+  category: sysdiagnose
+detection:
+  selection:
+    event_type: sqlite_row
+    sqlite_table|contains: "access"
+  condition: selection
+level: low
+tags:
+  - example
+  - sysdiagnose
+  - sqlite

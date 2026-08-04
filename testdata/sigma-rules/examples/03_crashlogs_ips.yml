@@ -1,0 +1,18 @@
+# Demo rule: crashlogs parser emits events[]; each event includes source, format, data, etc.
+title: Example - crash report from .ips under crashes_and_spins
+id: sdx-example-crashlogs-ips
+status: experimental
+description: Matches crashlogs entries whose source path ends with or contains .ips.
+logsource:
+  product: ios
+  category: sysdiagnose
+detection:
+  selection:
+    sysdiagnose_parser: crashlogs
+    source|contains: ".ips"
+  condition: selection
+level: medium
+tags:
+  - example
+  - sysdiagnose
+  - crashlogs

@@ -1,0 +1,73 @@
+[workspace]
+members = [".", "logarchive-decode"]
+resolver = "2"
+
+[package]
+name = "sysdiagnose_extractor_library"
+version = "0.1.0"
+edition = "2021"
+description = "Parse Apple iOS sysdiagnose archives (.tar.gz / .tar.xz) into structured JSON"
+license-file = "LICENSE"
+include = [
+    "src/**/*",
+    "logarchive-decode/**/*",
+    "apollo_modules/**/*.txt",
+    "bin/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[lib]
+name = "sysdiagnose_extractor_library"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["cli", "logarchive-decode"]
+cli = ["dep:clap", "dep:tracing-subscriber"]
+logarchive-decode = ["dep:sysdiagnose_logarchive_decode"]
+
+[[bin]]
+name = "sdx-cli"
+path = "bin/cli.rs"
+required-features = ["cli"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sigma-zero = { git = "https://github.com/ping2A/sigmazero.git" }
+regex = "1"
+thiserror = "2"
+tracing = "0.1"
+flate2 = "1"
+tar = "0.4"
+plist = { version = "1.9", features = ["serde"] }
+rayon = "1.8"
+memmap2 = "0.9"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+globset = "0.4"
+strum = { version = "0.26", features = ["derive"] }
+csv = "1.3"
+clap = { version = "4.0", features = ["derive"], optional = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+sysdiagnose_logarchive_decode = { path = "logarchive-decode", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rusqlite = { version = "0.32", features = ["bundled"] }
+tempfile = "3"
+xz2 = "0.1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+sqlite-wasm-rs = "0.5"
+
+[dev-dependencies]
+serde_json = "1.0"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tempfile = "3"
+sysdiagnose_logarchive_decode = { path = "logarchive-decode" }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

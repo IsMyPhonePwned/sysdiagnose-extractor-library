@@ -1,0 +1,11 @@
+[package]
+name = "sysdiagnose_logarchive_decode"
+version = "0.1.0"
+edition = "2021"
+description = "Unified-log decode for iOS sysdiagnose logarchive bundles (macos-unifiedlogs)"
+license-file = "../LICENSE"
+publish = false
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+macos-unifiedlogs = { git = "https://github.com/mandiant/macos-UnifiedLogs.git", rev = "27ff6651" }

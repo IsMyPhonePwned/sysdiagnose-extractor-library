@@ -1,0 +1,21 @@
+# Demo rule: ps parser rows expose snake_case columns from ps.txt (e.g. user, pid, command).
+# Log entries include sysdiagnose_parser: ps and fields from each row.
+title: Example - ps command line contains substring
+id: sdx-example-ps-command
+status: experimental
+description: >
+  Fires on process list rows where the command column matches. On iOS, many rows
+  reference launchd; tighten or replace the pattern for real hunting.
+logsource:
+  product: ios
+  category: sysdiagnose
+detection:
+  selection:
+    sysdiagnose_parser: ps
+    command|contains: "launchd"
+  condition: selection
+level: low
+tags:
+  - example
+  - sysdiagnose
+  - ps

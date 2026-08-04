@@ -1,0 +1,19 @@
+# Demo rule: UTF-8 / text extracts become event_type text_snippet with source_path and content.
+title: Example - log file snippet contains keyword
+id: sdx-example-text-snippet
+status: experimental
+description: Matches text_snippet entries (e.g. lockdownd, containermanager logs) when content matches.
+logsource:
+  product: ios
+  category: sysdiagnose
+detection:
+  selection:
+    event_type: text_snippet
+    source_path|contains: "logs/"
+    content|contains: "error"
+  condition: selection
+level: low
+tags:
+  - example
+  - sysdiagnose
+  - logs
