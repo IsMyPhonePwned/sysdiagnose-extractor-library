@@ -1,0 +1,20 @@
+[package]
+name = "sysdiagnose-extractor-py"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Python bindings for sysdiagnose-extractor-library"
+
+[workspace]
+
+[lib]
+name = "sysdiagnose_extractor"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.29", features = ["extension-module", "abi3-py39"] }
+serde_json = "1"
+sysdiagnose_extractor_library = { path = ".." }
+
+[build-dependencies]
+pyo3-build-config = "0.29"

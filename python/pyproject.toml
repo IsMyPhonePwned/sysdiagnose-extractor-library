@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin>=1.8,<2"]
+build-backend = "maturin"
+
+[project]
+name = "sysdiagnose-extractor"
+version = "0.1.0"
+description = "Parse Apple sysdiagnose archives"
+requires-python = ">=3.9"
+license = { text = "EUPL-1.2" }
+
+[tool.maturin]
+manifest-path = "Cargo.toml"
+module-name = "sysdiagnose_extractor"
