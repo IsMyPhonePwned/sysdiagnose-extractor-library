@@ -487,3 +487,233 @@ pub fn transparency_jsonl(archive: &SysdiagnoseArchive) -> Value {
     }
     json!({ "events": events })
 }
+
+/// Path → UTF-8 text (or skip/error stubs) for multi-file text parsers.
+pub fn text_files_result(
+    archive: &SysdiagnoseArchive,
+    parser_id: &str,
+    patterns: &[&str],
+    max_files: usize,
+) -> Result<Value, Box<dyn Error + Send + Sync>> {
+    let mut files = matching_files_patterns(archive, patterns).map_err(|e: GlobError| e.to_string())?;
+    files.sort_by_key(|(p, _)| *p);
+    let total_matched = files.len();
+    let mut truncated = 0usize;
+    if max_files > 0 && files.len() > max_files {
+        truncated = files.len() - max_files;
+        files.truncate(max_files);
+    }
+    let mut out = Map::new();
+    let mut skipped_oversized = Vec::new();
+    for (p, b) in files {
+        if b.len() > MAX_UTF8_FILE {
+            skipped_oversized.push(p.to_string());
+            out.insert(
+                p.to_string(),
+                json!({ "skipped_oversized": true, "size": b.len() }),
+            );
+            continue;
+        }
+        out.insert(
+            p.to_string(),
+            json!(String::from_utf8_lossy(b).into_owned()),
+        );
+    }
+    Ok(json!({
+        "parser": parser_id,
+        "format": "files",
+        "files": out,
+        "meta": {
+            "total_matched": total_matched,
+            "returned": out.len(),
+            "truncated_file_count": truncated,
+            "skipped_oversized": skipped_oversized,
+        }
+    }))
+}
+
+/// Binary members → size inventory (no decode).
+pub fn binary_inventory_result(
+    archive: &SysdiagnoseArchive,
+    parser_id: &str,
+    patterns: &[&str],
+    max_files: usize,
+) -> Result<Value, Box<dyn Error + Send + Sync>> {
+    let mut files = matching_files_patterns(archive, patterns).map_err(|e: GlobError| e.to_string())?;
+    files.sort_by_key(|(p, _)| *p);
+    let total_matched = files.len();
+    if max_files > 0 && files.len() > max_files {
+        files.truncate(max_files);
+    }
+    let mut entries = Vec::new();
+    let mut total_bytes = 0usize;
+    for (p, b) in &files {
+        total_bytes += b.len();
+        let magic = if b.starts_with(&[0x1f, 0x8b]) {
+            "gzip"
+        } else if b.starts_with(b"bplist") {
+            "bplist"
+        } else {
+            "binary"
+        };
+        entries.push(json!({
+            "path": p,
+            "size": b.len(),
+            "magic": magic,
+        }));
+    }
+    Ok(json!({
+        "parser": parser_id,
+        "format": "inventory",
+        "file_count": total_matched,
+        "returned": entries.len(),
+        "total_bytes": total_bytes,
+        "files": entries,
+        "note": "Proprietary / undecoded binary; inventory only",
+    }))
+}
+
+/// Parse `mount` lines: `device on mountpoint (opts…)`.
+pub fn parse_mount_txt(text: &str, module: &str) -> (Vec<Value>, Value) {
+    let mut events = Vec::new();
+    let mut root_entries = Vec::new();
+    let mut sealed_root = false;
+    let mut readonly_root = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let (device, rest) = match line.split_once(" on ") {
+            Some(p) => p,
+            None => {
+                events.push(json!({
+                    "message": line,
+                    "module": module,
+                    "data": { "raw": true }
+                }));
+                continue;
+            }
+        };
+        let (mountpoint, opts_raw) = match rest.rsplit_once(" (") {
+            Some((mp, o)) => (mp, o.trim_end_matches(')')),
+            None => (rest, ""),
+        };
+        let opts: Vec<String> = opts_raw
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        let sealed = opts.iter().any(|o| o == "sealed");
+        let readonly = opts.iter().any(|o| o == "read-only" || o == "rdonly");
+        let is_root = mountpoint == "/";
+        if is_root {
+            root_entries.push(json!({
+                "device": device,
+                "opts": opts,
+                "sealed": sealed,
+                "read_only": readonly,
+            }));
+            if sealed {
+                sealed_root = true;
+            }
+            if readonly {
+                readonly_root = true;
+            }
+        }
+        events.push(json!({
+            "message": format!("{device} on {mountpoint}"),
+            "module": module,
+            "data": {
+                "device": device,
+                "mountpoint": mountpoint,
+                "opts": opts,
+                "sealed": sealed,
+                "read_only": readonly,
+                "is_root": is_root,
+            }
+        }));
+    }
+    let summary = json!({
+        "root_mounts": root_entries,
+        "root_sealed": sealed_root,
+        "root_read_only": readonly_root,
+        "integrity_hint": if sealed_root && readonly_root {
+            "system_partition_sealed_readonly"
+        } else if readonly_root {
+            "root_readonly"
+        } else {
+            "check_root_mounts"
+        },
+    });
+    (events, summary)
+}
+
+/// Extract printable URL / scheme-like strings from LaunchServices csstore bytes.
+pub fn extract_lsaw_strings(bytes: &[u8], max_urls: usize, max_bundles: usize) -> Value {
+    let mut urls = Vec::new();
+    let mut bundles = Vec::new();
+    let mut seen_url = std::collections::BTreeSet::new();
+    let mut seen_bundle = std::collections::BTreeSet::new();
+    let mut cur = Vec::new();
+    let flush = |cur: &mut Vec<u8>,
+                 urls: &mut Vec<String>,
+                 bundles: &mut Vec<String>,
+                 seen_url: &mut std::collections::BTreeSet<String>,
+                 seen_bundle: &mut std::collections::BTreeSet<String>| {
+        if cur.len() < 6 {
+            cur.clear();
+            return;
+        }
+        if let Ok(s) = std::str::from_utf8(cur) {
+            if (s.starts_with("http://") || s.starts_with("https://") || s.contains("://"))
+                && seen_url.insert(s.to_string())
+                && urls.len() < max_urls
+            {
+                urls.push(s.to_string());
+            }
+            if s.contains('.')
+                && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_')
+                && s.matches('.').count() >= 2
+                && s.len() >= 8
+                && s.len() <= 200
+                && !s.starts_with("http")
+                && seen_bundle.insert(s.to_string())
+                && bundles.len() < max_bundles
+            {
+                // Heuristic bundle-id-like tokens (com.foo.bar).
+                if s.starts_with("com.") || s.starts_with("org.") || s.starts_with("net.") {
+                    bundles.push(s.to_string());
+                }
+            }
+        }
+        cur.clear();
+    };
+    for &b in bytes {
+        if (0x20..=0x7e).contains(&b) {
+            cur.push(b);
+        } else {
+            flush(
+                &mut cur,
+                &mut urls,
+                &mut bundles,
+                &mut seen_url,
+                &mut seen_bundle,
+            );
+        }
+    }
+    flush(
+        &mut cur,
+        &mut urls,
+        &mut bundles,
+        &mut seen_url,
+        &mut seen_bundle,
+    );
+    json!({
+        "urls": urls,
+        "url_count": urls.len(),
+        "bundle_id_hints": bundles,
+        "bundle_hint_count": bundles.len(),
+        "note": "Best-effort strings from csstore; not a full LaunchServices decode",
+    })
+}

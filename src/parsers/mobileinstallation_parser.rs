@@ -22,7 +22,10 @@ impl SysdiagnoseParser for MobileinstallationParser {
         let mut events = Vec::new();
         for (_, text) in matching_utf8_files(
             archive,
-            &["logs/MobileInstallation/mobile_installation.log*"],
+            &[
+                "logs/MobileInstallation/mobile_installation.log*",
+                "logs/MobileInstallation/mobile_installation_helper.log*",
+            ],
         )? {
             events.extend(extract_multiline_log(&text, "mobileinstallation", tz));
         }

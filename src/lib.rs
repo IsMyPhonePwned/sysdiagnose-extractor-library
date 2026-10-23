@@ -138,7 +138,7 @@ mod tests {
     }
 
     #[test]
-    fn all_parser_types_count_is_53() {
-        assert_eq!(all_parser_types().len(), 53);
+    fn all_parser_types_count_is_67() {
+        assert_eq!(all_parser_types().len(), 67);
     }
 }

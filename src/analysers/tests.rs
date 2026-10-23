@@ -23,28 +23,11 @@ fn archive_with(files: &[(&str, &[u8])]) -> SysdiagnoseArchive {
 
 #[test]
 fn analyser_from_str_roundtrip() {
-    let ids = [
-        "accounts",
-        "apps",
-        "coverage",
-        "file_stats",
-        "install_enrichment",
-        "mcstateshared",
-        "network_iocs",
-        "permissions",
-        "plist",
-        "ps_everywhere",
-        "ps_matrix",
-        "summary",
-        "timesketch",
-        "wifi_geolocation",
-        "wifi_geolocation_kml",
-    ];
-    for s in ids {
-        let t: AnalyserType = s.parse().expect(s);
-        assert_eq!(t.as_str(), s, "as_str for {s}");
-        let t2: AnalyserType = t.as_str().parse().expect("as_str parse");
-        assert_eq!(t, t2);
+    for t in AnalyserType::iter() {
+        let s = t.as_str();
+        let parsed: AnalyserType = s.parse().unwrap_or_else(|e| panic!("{s}: {e}"));
+        assert_eq!(parsed, t, "as_str roundtrip for {s}");
+        assert!(!t.description().is_empty(), "{s} empty description");
     }
 }
 

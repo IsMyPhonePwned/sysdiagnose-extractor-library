@@ -1,6 +1,7 @@
-//! One smoke test per parser and analyser variant on a minimal in-memory archive.
-//! Keep the macro lists in sync with `parsers/parser_type.rs` and `analysers/mod.rs`.
-//! Deeper analyser behaviour tests live in `analysers::tests`.
+//! Smoke tests for every [`ParserType`] and [`AnalyserType`] on a minimal archive.
+//!
+//! Coverage is driven by `EnumIter` so new variants cannot be forgotten.
+//! Deeper behaviour tests live under `parsers::*::tests` and `analysers::tests`.
 
 use crate::analysers::{analyser_for, AnalyserType};
 use crate::parser_for;
@@ -17,127 +18,100 @@ fn minimal_archive() -> SysdiagnoseArchive {
     SysdiagnoseArchive::from_files_for_test(m)
 }
 
-fn assert_parser_ok(pt: ParserType) {
+#[test]
+fn every_parser_runs_ok_on_minimal_archive() {
     let arch = minimal_archive();
-    let res = parser_for(pt).parse(&arch);
+    let mut failed = Vec::new();
+    for pt in ParserType::iter() {
+        if let Err(e) = parser_for(pt).parse(&arch) {
+            failed.push(format!("{} ({:?}): {e}", pt.as_str(), pt));
+        }
+    }
     assert!(
-        res.is_ok(),
-        "parser {:?} ({}): {:?}",
-        pt,
-        pt.as_str(),
-        res.err()
+        failed.is_empty(),
+        "parsers failed on minimal archive:\n{}",
+        failed.join("\n")
     );
 }
 
-fn assert_analyser_ok(at: AnalyserType) {
+#[test]
+fn every_analyser_runs_ok_on_minimal_archive() {
     let arch = minimal_archive();
     let parsed = HashMap::new();
-    let v: Result<Value, _> = analyser_for(at).analyse(&arch, &parsed);
-    let v = v.expect("analyser");
-    assert_eq!(v["analyser"], at.as_str());
-}
-
-macro_rules! parser_smoke {
-    ($($name:ident: $variant:path);* $(;)?) => {
-        $(
-            #[test]
-            fn $name() {
-                assert_parser_ok($variant);
+    let mut failed = Vec::new();
+    for at in AnalyserType::iter() {
+        match analyser_for(at).analyse(&arch, &parsed) {
+            Ok(v) => {
+                if v.get("analyser").and_then(|x| x.as_str()) != Some(at.as_str()) {
+                    failed.push(format!(
+                        "{}: expected analyser field {:?}, got {:?}",
+                        at.as_str(),
+                        at.as_str(),
+                        v.get("analyser")
+                    ));
+                }
             }
-        )*
-    };
-}
-
-parser_smoke! {
-    parser_accessibility_tcc: ParserType::accessibility_tcc;
-    parser_apollo_all: ParserType::apollo_all;
-    parser_appinstallation: ParserType::appinstallation;
-    parser_avconference_callsettings: ParserType::avconference_callsettings;
-    parser_battery_bdc: ParserType::battery_bdc;
-    parser_brctl: ParserType::brctl;
-    parser_containermanager: ParserType::containermanager;
-    parser_crashlogs: ParserType::crashlogs;
-    parser_disks: ParserType::disks;
-    parser_ioacpiplane: ParserType::ioacpiplane;
-    parser_iodevicetree: ParserType::iodevicetree;
-    parser_iofirewire: ParserType::iofirewire;
-    parser_iopower: ParserType::iopower;
-    parser_ioservice: ParserType::ioservice;
-    parser_iousb: ParserType::iousb;
-    parser_interactionc: ParserType::interactionc;
-    parser_itunesstore: ParserType::itunesstore;
-    parser_kbdebug: ParserType::kbdebug;
-    parser_knowledgec: ParserType::knowledgec;
-    parser_lockdownd: ParserType::lockdownd;
-    parser_logarchive: ParserType::logarchive;
-    parser_logdata_statistics: ParserType::logdata_statistics;
-    parser_logdata_statistics_txt: ParserType::logdata_statistics_txt;
-    parser_mcsettingsevents: ParserType::mcsettingsevents;
-    parser_mcstate_shared_profile: ParserType::mcstate_shared_profile;
-    parser_mobileactivation: ParserType::mobileactivation;
-    parser_mobilebackup: ParserType::mobilebackup;
-    parser_mobileinstallation: ParserType::mobileinstallation;
-    parser_networkextension: ParserType::networkextension;
-    parser_networkextensioncache: ParserType::networkextensioncache;
-    parser_netusage: ParserType::netusage;
-    parser_olddsc: ParserType::olddsc;
-    parser_plists: ParserType::plists;
-    parser_powerlogs: ParserType::powerlogs;
-    parser_ps: ParserType::ps;
-    parser_psthread: ParserType::psthread;
-    parser_quarantine_events: ParserType::quarantine_events;
-    parser_remotectl_dumpstate: ParserType::remotectl_dumpstate;
-    parser_safari_history: ParserType::safari_history;
-    parser_security_sysdiagnose: ParserType::security_sysdiagnose;
-    parser_screentime: ParserType::screentime;
-    parser_shutdownlogs: ParserType::shutdownlogs;
-    parser_spindumpnosymbols: ParserType::spindumpnosymbols;
-    parser_swcutil: ParserType::swcutil;
-    parser_sys: ParserType::sys;
-    parser_taskinfo: ParserType::taskinfo;
-    parser_transparency: ParserType::transparency;
-    parser_transparency_json: ParserType::transparency_json;
-    parser_uuid2path: ParserType::uuid2path;
-    parser_wifi_known_networks: ParserType::wifi_known_networks;
-    parser_wifinetworks: ParserType::wifinetworks;
-    parser_wifiscan: ParserType::wifiscan;
-    parser_wifisecurity: ParserType::wifisecurity;
-}
-
-macro_rules! analyser_smoke {
-    ($($name:ident: $variant:path);* $(;)?) => {
-        $(
-            #[test]
-            fn $name() {
-                assert_analyser_ok($variant);
-            }
-        )*
-    };
-}
-
-analyser_smoke! {
-    analyser_apps: AnalyserType::apps;
-    analyser_coverage: AnalyserType::coverage;
-    analyser_file_stats: AnalyserType::file_stats;
-    analyser_install_enrichment: AnalyserType::install_enrichment;
-    analyser_mcstateshared: AnalyserType::mcstateshared;
-    analyser_network_iocs: AnalyserType::network_iocs;
-    analyser_permissions: AnalyserType::permissions;
-    analyser_plist: AnalyserType::plist;
-    analyser_ps_everywhere: AnalyserType::ps_everywhere;
-    analyser_ps_matrix: AnalyserType::ps_matrix;
-    analyser_summary: AnalyserType::summary;
-    analyser_timesketch: AnalyserType::timesketch;
-    analyser_wifi_geolocation: AnalyserType::wifi_geolocation;
-    analyser_wifi_geolocation_kml: AnalyserType::wifi_geolocation_kml;
+            Err(e) => failed.push(format!("{} ({:?}): {e}", at.as_str(), at)),
+        }
+    }
+    assert!(
+        failed.is_empty(),
+        "analysers failed on minimal archive:\n{}",
+        failed.join("\n")
+    );
 }
 
 #[test]
 fn parser_type_enum_iter_matches_expected_count() {
-    assert_eq!(ParserType::iter().count(), 53);
+    assert_eq!(ParserType::iter().count(), 67);
 }
 
 #[test]
 fn analyser_type_enum_iter_matches_expected_count() {
     assert_eq!(AnalyserType::iter().count(), 15);
+}
+
+#[test]
+fn parser_for_covers_every_parser_type() {
+    for pt in ParserType::iter() {
+        let _ = parser_for(pt);
+    }
+}
+
+#[test]
+fn analyser_for_covers_every_analyser_type() {
+    for at in AnalyserType::iter() {
+        let _ = analyser_for(at);
+    }
+}
+
+#[test]
+fn every_parser_as_str_roundtrips_via_from_str() {
+    for pt in ParserType::iter() {
+        let s = pt.as_str();
+        let parsed: ParserType = s.parse().unwrap_or_else(|e| panic!("{s}: {e}"));
+        assert_eq!(parsed, pt, "FromStr mismatch for {s}");
+        assert!(!pt.description().is_empty(), "{s} has empty description");
+    }
+}
+
+#[test]
+fn every_analyser_as_str_roundtrips_via_from_str() {
+    for at in AnalyserType::iter() {
+        let s = at.as_str();
+        let parsed: AnalyserType = s.parse().unwrap_or_else(|e| panic!("{s}: {e}"));
+        assert_eq!(parsed, at, "FromStr mismatch for {s}");
+        assert!(!at.description().is_empty(), "{s} has empty description");
+    }
+}
+
+/// Sanity: smoke helpers still type-check against analyser JSON shape.
+#[test]
+fn coverage_analyser_returns_json_object() {
+    let arch = minimal_archive();
+    let parsed = HashMap::new();
+    let v: Value = analyser_for(AnalyserType::coverage)
+        .analyse(&arch, &parsed)
+        .expect("coverage");
+    assert!(v.is_object());
 }

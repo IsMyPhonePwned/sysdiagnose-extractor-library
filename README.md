@@ -44,7 +44,7 @@ $BIN parse -i sysdiagnose.tar.gz --rules-dir testdata/sigma-rules \
 
 | Flag | Default / note |
 |------|----------------|
-| `--parser NAME` | Repeatable; default = all (~53) |
+| `--parser NAME` | Repeatable; default = all (~67) |
 | `--analyser NAME` | Repeatable; or `--run-analysers` for all |
 | `--max-entry-mb` | `64` — larger members are skipped |
 | `--logarchive-decode-max-lines` | `2500` — raising this slows runs a lot |
@@ -86,7 +86,7 @@ $BIN parse -i sysdiagnose.tar.gz --parser remotectl_dumpstate -o out.json --pret
 
 ## Performance
 
-- Prefer `--parser …` over running all 53. Avoid running **`apollo_all`** together with `knowledgec` / `powerlogs` / `netusage` / … (duplicate work).
+- Prefer `--parser …` over running all parsers. Avoid running **`apollo_all`** together with `knowledgec` / `powerlogs` / `netusage` / … (duplicate work).
 - Cap **`plists`** with `SYSDIAGNOSE_PLISTS_MAX_FILES`; keep **`logarchive`** line limit low; leave **`--ioservice-full-tree`** off.
 - For repeated runs: `pigz -dc archive.tar.gz > archive.tar` once, then pass the `.tar` (memory-mapped).
 - Skip `--pretty` / `--show-parser-results` on full runs.
