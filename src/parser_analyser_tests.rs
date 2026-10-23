@@ -139,5 +139,5 @@ fn parser_type_enum_iter_matches_expected_count() {
 
 #[test]
 fn analyser_type_enum_iter_matches_expected_count() {
-    assert_eq!(AnalyserType::iter().count(), 14);
+    assert_eq!(AnalyserType::iter().count(), 15);
 }

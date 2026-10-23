@@ -10,6 +10,7 @@
 //! still empty after preferred sources.
 
 use serde_json::{json, Map, Value};
+use std::sync::Arc;
 
 use crate::archive::SysdiagnoseArchive;
 use crate::glob_match::matching_files_patterns;
@@ -213,7 +214,7 @@ pub fn run(parsed: &ParsedByParser, archive: &SysdiagnoseArchive) -> Value {
         }
         // Legacy / test shape: `{ "logs/...": "raw log text" }` when events are absent.
         if !mined_from_events {
-            if let Value::Object(paths) = &mobile {
+            if let Value::Object(paths) = mobile.as_ref() {
                 for (path, val) in paths {
                     let Value::String(text) = val else {
                         continue;
@@ -317,7 +318,7 @@ pub fn run(parsed: &ParsedByParser, archive: &SysdiagnoseArchive) -> Value {
 
     let mobilebackup = get_or_parse(archive, parsed, ParserType::mobilebackup);
     if !value_looks_like_hard_error(&mobilebackup) {
-        if let Value::Object(paths) = &mobilebackup {
+        if let Value::Object(paths) = mobilebackup.as_ref() {
             for (path, val) in paths {
                 merge_mvt_plist_bundle_signals(val, &mut apps, "mobilebackup", Some(path.as_str()));
             }
@@ -620,7 +621,7 @@ fn mine_logdata_bundle_ids(
     apps: &mut Map<String, Value>,
 ) {
     let logdata = get_or_parse(archive, parsed, ParserType::logdata_statistics);
-    let Value::Object(paths) = logdata else {
+    let Value::Object(paths) = logdata.as_ref() else {
         return;
     };
     for (_p, lines) in paths {
@@ -684,11 +685,11 @@ mod apps_analyser_tests {
 
     fn minimal_parsed_stub() -> ParsedByParser {
         let mut m = HashMap::new();
-        m.insert("powerlogs".to_string(), json!({}));
-        m.insert("mobilebackup".to_string(), json!({}));
+        m.insert("powerlogs".to_string(), Arc::new(json!({})));
+        m.insert("mobilebackup".to_string(), Arc::new(json!({})));
         m.insert(
             "plists".to_string(),
-            json!({ "parser": "plists", "files": {} }),
+            Arc::new(json!({ "parser": "plists", "files": {} })),
         );
         m
     }
@@ -787,18 +788,15 @@ mod apps_analyser_tests {
     #[test]
     fn run_apps_merges_appex_hits_into_host_app() {
         let mut parsed = minimal_parsed_stub();
-        parsed.insert("accessibility_tcc".to_string(), json!({}));
-        parsed.insert("itunesstore".to_string(), json!({}));
-        parsed.insert("appinstallation".to_string(), json!({}));
-        parsed.insert(
-            "mobileinstallation".to_string(),
-            json!({
+        parsed.insert("accessibility_tcc".to_string(), Arc::new(json!({})));
+        parsed.insert("itunesstore".to_string(), Arc::new(json!({})));
+        parsed.insert("appinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("mobileinstallation".to_string(), Arc::new(json!({
                 "logs/MobileInstallation/mobile_installation.log.0":
                     "Data container for com.cbouvat.saracroche.blocker is now at /x\n\
                      Staging <MIInstallableBundle ID=com.cbouvat.saracroche; Version=1>\n\
                      Installing parallel placeholder for staged update \"B723E939-FEC7-49A2-9D0D-FC199494A818_com.cbouvat.saracroche\"\n"
-            }),
-        );
+            })));
 
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let out = run(&parsed, &arch);
@@ -813,9 +811,7 @@ mod apps_analyser_tests {
     #[test]
     fn run_apps_reads_sqlite_map_nesting_for_tcc() {
         let mut parsed = minimal_parsed_stub();
-        parsed.insert(
-            "accessibility_tcc".to_string(),
-            json!({
+        parsed.insert("accessibility_tcc".to_string(), Arc::new(json!({
                 "parser": "accessibility_tcc",
                 "format": "jsonl",
                 "events": [{
@@ -826,11 +822,10 @@ mod apps_analyser_tests {
                         "apollo_module": "tcc_db"
                     }
                 }]
-            }),
-        );
-        parsed.insert("itunesstore".to_string(), json!({}));
-        parsed.insert("appinstallation".to_string(), json!({}));
-        parsed.insert("mobileinstallation".to_string(), json!({}));
+            })));
+        parsed.insert("itunesstore".to_string(), Arc::new(json!({})));
+        parsed.insert("appinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("mobileinstallation".to_string(), Arc::new(json!({})));
 
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let out = run(&parsed, &arch);
@@ -851,10 +846,8 @@ mod apps_analyser_tests {
     #[test]
     fn run_apps_reads_nested_itunes_rows() {
         let mut parsed = minimal_parsed_stub();
-        parsed.insert("accessibility_tcc".to_string(), json!({}));
-        parsed.insert(
-            "itunesstore".to_string(),
-            json!({
+        parsed.insert("accessibility_tcc".to_string(), Arc::new(json!({})));
+        parsed.insert("itunesstore".to_string(), Arc::new(json!({
                 "parser": "itunesstore",
                 "source_path": "logs/itunesstored/downloads.99.sqlitedb",
                 "data": {
@@ -862,10 +855,9 @@ mod apps_analyser_tests {
                         { "bundle_id": "com.example.itunes" }
                     ]
                 }
-            }),
-        );
-        parsed.insert("appinstallation".to_string(), json!({}));
-        parsed.insert("mobileinstallation".to_string(), json!({}));
+            })));
+        parsed.insert("appinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("mobileinstallation".to_string(), Arc::new(json!({})));
 
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let out = run(&parsed, &arch);
@@ -882,13 +874,11 @@ mod apps_analyser_tests {
     #[test]
     fn run_apps_merges_powerlogs_app_info() {
         let mut parsed = minimal_parsed_stub();
-        parsed.insert("accessibility_tcc".to_string(), json!({}));
-        parsed.insert("itunesstore".to_string(), json!({}));
-        parsed.insert("appinstallation".to_string(), json!({}));
-        parsed.insert("mobileinstallation".to_string(), json!({}));
-        parsed.insert(
-            "powerlogs".to_string(),
-            json!({
+        parsed.insert("accessibility_tcc".to_string(), Arc::new(json!({})));
+        parsed.insert("itunesstore".to_string(), Arc::new(json!({})));
+        parsed.insert("appinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("mobileinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("powerlogs".to_string(), Arc::new(json!({
                 "parser": "powerlogs",
                 "format": "jsonl",
                 "events": [{
@@ -912,8 +902,7 @@ mod apps_analyser_tests {
                         "apollo_module": "powerlog_other"
                     }
                 }]
-            }),
-        );
+            })));
 
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let out = run(&parsed, &arch);
@@ -935,22 +924,19 @@ mod apps_analyser_tests {
     #[test]
     fn run_apps_falls_back_to_brctl_when_preferred_empty() {
         let mut parsed = minimal_parsed_stub();
-        parsed.insert("accessibility_tcc".to_string(), json!({
+        parsed.insert("accessibility_tcc".to_string(), Arc::new(json!({
             "parser": "accessibility_tcc",
             "format": "jsonl",
             "events": []
-        }));
-        parsed.insert("itunesstore".to_string(), json!({}));
-        parsed.insert("appinstallation".to_string(), json!({}));
-        parsed.insert("mobileinstallation".to_string(), json!({}));
-        parsed.insert(
-            "brctl".to_string(),
-            json!({
+        })));
+        parsed.insert("itunesstore".to_string(), Arc::new(json!({})));
+        parsed.insert("appinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("mobileinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("brctl".to_string(), Arc::new(json!({
                 "parser": "brctl",
                 "data": "id=\"com.example.frombrctl\" localizedName=\"Demo\""
-            }),
-        );
-        parsed.insert("logdata_statistics".to_string(), json!({}));
+            })));
+        parsed.insert("logdata_statistics".to_string(), Arc::new(json!({})));
 
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let out = run(&parsed, &arch);
@@ -964,7 +950,6 @@ mod apps_analyser_tests {
     #[test]
     fn run_apps_reads_app_info_table_from_archive_powerlog() {
         use rusqlite::Connection;
-        use std::sync::Arc;
 
         let path = tempfile::NamedTempFile::new().unwrap();
         let conn = Connection::open(path.path()).unwrap();
@@ -984,23 +969,16 @@ mod apps_analyser_tests {
                 (TIMESTAMP, APPNAME, APPEXECUTABLE, APPBUNDLEID, APPBUILDVERSION, APPBUNDLEVERSION, APPTYPE, APPDELETEDDATE)
             VALUES
                 (1700000000, 'Saracroche', 'Saracroche', 'com.cbouvat.saracroche', '100', '4.12.0', 4, 0),
-                (1700000001, 'Safari', 'MobileSafari', 'com.apple.mobilesafari', '1', '17.0', 3, 0);",
-        )
+                (1700000001, 'Safari', 'MobileSafari', 'com.apple.mobilesafari', '1', '17.0', 3, 0);")
         .unwrap();
         let bytes: Arc<[u8]> = std::fs::read(path.path()).unwrap().into();
 
         let mut parsed = minimal_parsed_stub();
-        parsed.insert(
-            "accessibility_tcc".to_string(),
-            json!({ "parser": "accessibility_tcc", "format": "jsonl", "events": [] }),
-        );
-        parsed.insert("itunesstore".to_string(), json!({}));
-        parsed.insert("appinstallation".to_string(), json!({}));
-        parsed.insert("mobileinstallation".to_string(), json!({}));
-        parsed.insert(
-            "powerlogs".to_string(),
-            json!({ "parser": "powerlogs", "format": "jsonl", "events": [] }),
-        );
+        parsed.insert("accessibility_tcc".to_string(), Arc::new(json!({ "parser": "accessibility_tcc", "format": "jsonl", "events": [] })));
+        parsed.insert("itunesstore".to_string(), Arc::new(json!({})));
+        parsed.insert("appinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("mobileinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("powerlogs".to_string(), Arc::new(json!({ "parser": "powerlogs", "format": "jsonl", "events": [] })));
 
         let mut files = HashMap::new();
         files.insert(
@@ -1024,24 +1002,18 @@ mod apps_analyser_tests {
     #[test]
     fn run_apps_skips_brctl_when_mobileinstallation_has_apps() {
         let mut parsed = minimal_parsed_stub();
-        parsed.insert("accessibility_tcc".to_string(), json!({}));
-        parsed.insert("itunesstore".to_string(), json!({}));
-        parsed.insert("appinstallation".to_string(), json!({}));
-        parsed.insert(
-            "mobileinstallation".to_string(),
-            json!({
+        parsed.insert("accessibility_tcc".to_string(), Arc::new(json!({})));
+        parsed.insert("itunesstore".to_string(), Arc::new(json!({})));
+        parsed.insert("appinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("mobileinstallation".to_string(), Arc::new(json!({
                 "logs/MobileInstallation/mobile_installation.log.0":
                     "Staging <MIInstallableBundle ID=com.example.keepme; Version=1>\n"
-            }),
-        );
-        parsed.insert(
-            "brctl".to_string(),
-            json!({
+            })));
+        parsed.insert("brctl".to_string(), Arc::new(json!({
                 "parser": "brctl",
                 "data": "id=\"com.noise.frombrctl\" localizedName=\"Noise\""
-            }),
-        );
-        parsed.insert("logdata_statistics".to_string(), json!({}));
+            })));
+        parsed.insert("logdata_statistics".to_string(), Arc::new(json!({})));
 
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let out = run(&parsed, &arch);
@@ -1054,30 +1026,24 @@ mod apps_analyser_tests {
     #[test]
     fn run_apps_merges_mobilebackup_and_itunes_metadata_plists() {
         let mut parsed = minimal_parsed_stub();
-        parsed.insert("accessibility_tcc".to_string(), json!({}));
-        parsed.insert("itunesstore".to_string(), json!({}));
-        parsed.insert("appinstallation".to_string(), json!({}));
-        parsed.insert("mobileinstallation".to_string(), json!({}));
-        parsed.insert(
-            "mobilebackup".to_string(),
-            json!({
+        parsed.insert("accessibility_tcc".to_string(), Arc::new(json!({})));
+        parsed.insert("itunesstore".to_string(), Arc::new(json!({})));
+        parsed.insert("appinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("mobileinstallation".to_string(), Arc::new(json!({})));
+        parsed.insert("mobilebackup".to_string(), Arc::new(json!({
                 "logs/MobileBackup/com.apple.MobileBackup.plist": {
                     "Installed Applications": ["com.backup.listed"],
                     "K": { "softwareVersionBundleId": "com.backup.nested" }
                 }
-            }),
-        );
-        parsed.insert(
-            "plists".to_string(),
-            json!({
+            })));
+        parsed.insert("plists".to_string(), Arc::new(json!({
                 "parser": "plists",
                 "files": {
                     "Containers/Bundle/Application/uuid/iTunesMetadata.plist": {
                         "softwareVersionBundleId": "com.example.itunesmeta"
                     }
                 }
-            }),
-        );
+            })));
 
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let out = run(&parsed, &arch);

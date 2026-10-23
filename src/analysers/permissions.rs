@@ -92,13 +92,12 @@ pub fn run(parsed: &ParsedByParser, archive: &SysdiagnoseArchive) -> Value {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     #[test]
     fn rolls_up_tcc_events_by_bundle_id() {
         let mut parsed = HashMap::new();
-        parsed.insert(
-            "accessibility_tcc".into(),
-            json!({
+        parsed.insert("accessibility_tcc".into(), Arc::new(json!({
                 "parser": "accessibility_tcc",
                 "format": "jsonl",
                 "events": [
@@ -123,8 +122,7 @@ mod tests {
                         }
                     }
                 ]
-            }),
-        );
+            })));
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let v = run(&parsed, &arch);
         assert_eq!(v["app_count"], 1);

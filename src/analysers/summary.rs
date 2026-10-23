@@ -393,7 +393,7 @@ pub fn run(parsed: &ParsedByParser, archive: &SysdiagnoseArchive) -> Value {
 
     lines.push("\n## MCState shared profiles (summary)".to_string());
     let mc = get_or_parse(archive, parsed, ParserType::mcstate_shared_profile);
-    if let Value::Object(paths) = mc {
+    if let Value::Object(paths) = mc.as_ref() {
         if paths.is_empty() {
             lines.push("No profile stub files.".to_string());
         } else {

@@ -3,6 +3,7 @@
 use serde_json::{json, Value};
 use sigma_zero::models::LogEntry;
 use std::error::Error;
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 use crate::parsers::ParserType;
@@ -32,7 +33,7 @@ fn append_context(obj: &mut serde_json::Map<String, Value>, parser: &str, output
 pub fn extract_all_log_entries(
     results: &[(
         ParserType,
-        Result<Value, Box<dyn Error + Send + Sync>>,
+        Result<Arc<Value>, Box<dyn Error + Send + Sync>>,
         std::time::Duration,
     )],
 ) -> Vec<(ParserType, Vec<LogEntry>)> {
@@ -45,7 +46,8 @@ pub fn extract_all_log_entries(
                     "Sigma: extracting log entries from {} parser",
                     parser_type.as_str()
                 );
-                if let Some(entries) = extract_entries_for_parser(parser_type, json_output) {
+                if let Some(entries) = extract_entries_for_parser(parser_type, json_output.as_ref())
+                {
                     if entries.is_empty() {
                         debug!("{} parser: no Sigma entries", parser_type.as_str());
                     } else {

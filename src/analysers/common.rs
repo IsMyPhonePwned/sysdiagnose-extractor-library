@@ -1,7 +1,7 @@
 //! Shared helpers for analysers (parser JSON lookup, plist/SQLite walks, Wi‑Fi plist helpers).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use regex::Regex;
 use serde_json::{json, Map, Value};
@@ -10,7 +10,14 @@ use crate::archive::SysdiagnoseArchive;
 use crate::parser_for;
 use crate::parsers::ParserType;
 
-pub type ParsedByParser = HashMap<String, Value>;
+/// Parser id → shared JSON (`Arc` so CLI / analysers / Sigma can reuse without deep-cloning).
+pub type ParsedByParser = HashMap<String, Arc<Value>>;
+
+/// Wrap parser JSON for insertion into [`ParsedByParser`].
+#[inline]
+pub fn arc_value(v: Value) -> Arc<Value> {
+    Arc::new(v)
+}
 
 pub(crate) fn xml_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -31,15 +38,17 @@ pub(crate) fn get_or_parse(
     archive: &SysdiagnoseArchive,
     parsed: &ParsedByParser,
     pt: ParserType,
-) -> Value {
+) -> Arc<Value> {
     if let Some(v) = parsed.get(pt.as_str()) {
         if !value_looks_like_hard_error(v) {
-            return v.clone();
+            return Arc::clone(v);
         }
     }
-    parser_for(pt)
-        .parse(archive)
-        .unwrap_or_else(|e| json!({ "error": e.to_string() }))
+    Arc::new(
+        parser_for(pt)
+            .parse(archive)
+            .unwrap_or_else(|e| json!({ "error": e.to_string() })),
+    )
 }
 
 pub(crate) fn value_looks_like_hard_error(v: &Value) -> bool {
@@ -82,7 +91,7 @@ pub(crate) fn device_props_from_remotectl(
 ) -> Value {
     let v = parsed
         .get("remotectl_dumpstate")
-        .cloned()
+        .map(Arc::clone)
         .unwrap_or_else(|| get_or_parse(archive, parsed, ParserType::remotectl_dumpstate));
     let Some(props) = find_map_with_keys(&v, &["OSVersion", "SerialNumber"])
         .or_else(|| find_map_with_keys(&v, &["OSVersion", "BuildVersion"]))

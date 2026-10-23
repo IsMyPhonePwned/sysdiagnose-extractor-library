@@ -31,7 +31,7 @@ use std::error::Error;
 use std::str::FromStr;
 
 pub use common::{
-    canonicalize_app_bundle_id, extract_app_bundle_id_from_text, is_likely_app_bundle_id,
+    arc_value, canonicalize_app_bundle_id, extract_app_bundle_id_from_text, is_likely_app_bundle_id,
     ParsedByParser,
 };
 

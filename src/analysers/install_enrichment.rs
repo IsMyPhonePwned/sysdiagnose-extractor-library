@@ -2,7 +2,7 @@
 //! activity (TrollStore, TrollDecrypt, AltStore, …).
 
 use std::collections::HashSet;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use regex::Regex;
 use serde_json::{json, Map, Value};
@@ -561,9 +561,7 @@ mod tests {
     #[test]
     fn correlate_reinstall_attaches_trolldecrypt() {
         let mut parsed: ParsedByParser = std::collections::HashMap::new();
-        parsed.insert(
-            "mobileinstallation".into(),
-            json!({
+        parsed.insert("mobileinstallation".into(), Arc::new(json!({
                 "parser": "mobileinstallation",
                 "format": "jsonl",
                 "events": [
@@ -582,19 +580,15 @@ mod tests {
                         }
                     }
                 ]
-            }),
-        );
-        parsed.insert(
-            "logarchive".into(),
-            json!({
+            })));
+        parsed.insert("logarchive".into(), Arc::new(json!({
                 "parser": "logarchive",
                 "events": [{
                     "datetime": "2026-01-01T12:05:00.000000Z",
                     "message": "TrollDecrypt finished dumping org.whispersystems.signal",
                     "process_name": "TrollDecrypt"
                 }]
-            }),
-        );
+            })));
         let arch = crate::SysdiagnoseArchive::from_files_for_test(Default::default());
         let out = run(&parsed, &arch);
         assert_eq!(out["analyser"], "install_enrichment");
@@ -616,9 +610,7 @@ mod tests {
     #[test]
     fn dump_then_uninstall_attaches_tool_without_app_token() {
         let mut parsed: ParsedByParser = std::collections::HashMap::new();
-        parsed.insert(
-            "mobileinstallation".into(),
-            json!({
+        parsed.insert("mobileinstallation".into(), Arc::new(json!({
                 "parser": "mobileinstallation",
                 "format": "jsonl",
                 "events": [{
@@ -629,19 +621,15 @@ mod tests {
                         "bundle_id": "org.whispersystems.signal"
                     }
                 }]
-            }),
-        );
-        parsed.insert(
-            "powerlogs".into(),
-            json!({
+            })));
+        parsed.insert("powerlogs".into(), Arc::new(json!({
                 "parser": "powerlogs",
                 "events": [{
                     "datetime": "2025-04-07T14:22:00.000000Z",
                     "message": "App Usage: approle=1, display=0",
                     "bundle_id": "com.fiore.trolldecrypt"
                 }]
-            }),
-        );
+            })));
         let arch = crate::SysdiagnoseArchive::from_files_for_test(Default::default());
         let out = run(&parsed, &arch);
         let deleted = out["events"]
@@ -662,9 +650,7 @@ mod tests {
     #[test]
     fn lone_install_without_tokens_does_not_attach_nearby_tool() {
         let mut parsed: ParsedByParser = std::collections::HashMap::new();
-        parsed.insert(
-            "mobileinstallation".into(),
-            json!({
+        parsed.insert("mobileinstallation".into(), Arc::new(json!({
                 "parser": "mobileinstallation",
                 "format": "jsonl",
                 "events": [{
@@ -675,19 +661,15 @@ mod tests {
                         "bundle_id": "org.whispersystems.signal"
                     }
                 }]
-            }),
-        );
-        parsed.insert(
-            "powerlogs".into(),
-            json!({
+            })));
+        parsed.insert("powerlogs".into(), Arc::new(json!({
                 "parser": "powerlogs",
                 "events": [{
                     "datetime": "2025-04-07T13:20:00.000000Z",
                     "message": "App Usage: approle=1",
                     "bundle_id": "com.fiore.trolldecrypt"
                 }]
-            }),
-        );
+            })));
         let arch = crate::SysdiagnoseArchive::from_files_for_test(Default::default());
         let out = run(&parsed, &arch);
         let install = out["events"]

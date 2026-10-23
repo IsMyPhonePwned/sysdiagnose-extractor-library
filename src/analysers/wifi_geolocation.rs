@@ -13,7 +13,7 @@ use super::common::{get_or_parse, xml_escape, ParsedByParser};
 pub fn run(parsed: &ParsedByParser, archive: &SysdiagnoseArchive) -> Value {
     let w = get_or_parse(archive, parsed, ParserType::wifi_known_networks);
     let mut wpts = String::new();
-    let paths_ref = match &w {
+    let paths_ref = match w.as_ref() {
         Value::Object(o)
             if o.get("parser").and_then(|p| p.as_str()) == Some("wifi_known_networks") =>
         {

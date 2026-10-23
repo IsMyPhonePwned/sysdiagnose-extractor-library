@@ -457,7 +457,7 @@ pub fn run(parsed: &ParsedByParser, archive: &SysdiagnoseArchive) -> Value {
     }
 
     let logdata = get_or_parse(archive, parsed, ParserType::logdata_statistics);
-    if let Value::Object(paths) = logdata {
+    if let Value::Object(paths) = logdata.as_ref() {
         for (_p, lines) in paths {
             let Some(arr) = lines.as_array() else {
                 continue;
@@ -474,7 +474,7 @@ pub fn run(parsed: &ParsedByParser, archive: &SysdiagnoseArchive) -> Value {
 
     let u2p = get_or_parse(archive, parsed, ParserType::uuid2path);
     if !value_looks_like_hard_error(&u2p) {
-        if let Value::Object(files) = u2p {
+        if let Value::Object(files) = u2p.as_ref() {
             for (_path, root) in files {
                 for s in uuid2path_strings(&root) {
                     register(&mut by_key, &s, "uuid2path", None, Map::new());

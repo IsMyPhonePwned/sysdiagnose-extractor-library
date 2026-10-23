@@ -46,8 +46,12 @@ fn parse(py: Python<'_>, path: &str, parsers: Option<Vec<String>>) -> PyResult<P
     let mut out = Map::new();
     for (kind, result, duration) in run_parsers_concurrently(archive, jobs) {
         let entry = match result {
-            Ok(data) => json!({"ok": true, "ms": duration.as_secs_f64() * 1000.0, "data": data}),
-            Err(err) => json!({"ok": false, "ms": duration.as_secs_f64() * 1000.0, "error": err.to_string()}),
+            Ok(data) => {
+                json!({"ok": true, "ms": duration.as_secs_f64() * 1000.0, "data": data.as_ref()})
+            }
+            Err(err) => {
+                json!({"ok": false, "ms": duration.as_secs_f64() * 1000.0, "error": err.to_string()})
+            }
         };
         out.insert(kind.as_str().to_string(), entry);
     }

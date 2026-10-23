@@ -52,8 +52,9 @@ mod tab_hierarchy;
 pub mod util;
 
 pub use analysers::{
-    all_analyser_types, analyser_for, canonicalize_app_bundle_id, extract_app_bundle_id_from_text,
-    is_likely_app_bundle_id, Analyser, AnalyserType, BuiltinAnalyser, ParsedByParser,
+    all_analyser_types, analyser_for, arc_value, canonicalize_app_bundle_id,
+    extract_app_bundle_id_from_text, is_likely_app_bundle_id, Analyser, AnalyserType,
+    BuiltinAnalyser, ParsedByParser,
 };
 pub use archive::{parse_bundle_acquisition, ArchiveOptions, SysdiagnoseArchive};
 pub use error::ArchiveError;
@@ -77,12 +78,15 @@ pub fn parser_for_with_options(
 }
 
 /// Run parsers in parallel over a shared [`SysdiagnoseArchive`].
+///
+/// Successful results are wrapped in [`Arc`] so callers can share JSON with analysers / Sigma
+/// without deep-cloning large trees.
 pub fn run_parsers_concurrently(
     archive: Arc<SysdiagnoseArchive>,
     parsers_to_run: Vec<(ParserType, Box<dyn SysdiagnoseParser + Send + Sync>)>,
 ) -> Vec<(
     ParserType,
-    Result<Value, Box<dyn Error + Send + Sync>>,
+    Result<Arc<Value>, Box<dyn Error + Send + Sync>>,
     Duration,
 )> {
     parsers_to_run
@@ -92,13 +96,13 @@ pub fn run_parsers_concurrently(
             // `std::time::Instant` is not implemented on wasm32-unknown-unknown (panics).
             #[cfg(target_arch = "wasm32")]
             let (result, duration) = {
-                let result = parser.parse(arch.as_ref());
+                let result = parser.parse(arch.as_ref()).map(Arc::new);
                 (result, Duration::ZERO)
             };
             #[cfg(not(target_arch = "wasm32"))]
             let (result, duration) = {
                 let start = std::time::Instant::now();
-                let result = parser.parse(arch.as_ref());
+                let result = parser.parse(arch.as_ref()).map(Arc::new);
                 (result, start.elapsed())
             };
             (parser_type, result, duration)

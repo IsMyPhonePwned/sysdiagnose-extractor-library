@@ -396,10 +396,48 @@ When you use `**--analyser`** or `**--run-analysers**` but do **not** pass `**--
 
 ## Archive loading
 
-- **gzip** (`.tar.gz` / `.tgz`), **xz** (`.tar.xz`), or **plain** tar; single top-level directory stripped; `**._*`** skipped.
+- **gzip** (`.tar.gz` / `.tgz`), **xz** (`.tar.xz`), or **plain** tar; single top-level directory stripped; `**._*`** skipped. Gzip uses **flate2** with the **`zlib-rs`** backend (faster than the default miniz_oxide decoder).
 - Supplemental CSIRC-style crash dumps (members under `private/var/.../CrashReporter/`) are accepted; `crashlogs` matches both `crashes_and_spins/**/*.ips` and `**/CrashReporter/**/*.ips`.
 - Nested `sysdiagnose_*.tar.gz` / `.tgz` / `.tar.xz` members are expanded into the same file map by default (outer CrashReporter paths win on conflict). Cap: **`max_nested_sysdiagnose_bytes`** (default **512 MiB**).
 - Other members over `**max_entry_bytes**` are skipped (default **64 MiB**).
+
+## Performance tips
+
+### Without changing code
+
+- **Run only the parsers you need.** By default all 53 run. Use `--parser ps --parser crashlogs …`. The ones that cost the most:
+  - **`apollo_all`**: re-runs every APOLLO module on every database it finds, repeating the work of `knowledgec`, `powerlogs`, `netusage`, `screentime`, and the other database parsers. Run either `apollo_all` **or** those individual parsers, not both.
+  - **`plists`**: reads up to 600 plists. Lower `SYSDIAGNOSE_PLISTS_MAX_FILES` if you don’t need all of them.
+  - **`logarchive`**: keep `--logarchive-decode-max-lines` low (default **2 500**). Raising it is the quickest way to make a run slow.
+  - **`ioservice`**: leave `--ioservice-full-tree` off.
+- **Analyse the same archive more than once?** Decompress once. Turning `.tar.gz` back into raw data is single-threaded. Prefer `pigz -dc sysdiagnose.tar.gz > sysdiagnose.tar` once, then pass the `.tar`. The library memory-maps plain `.tar` files, so loading becomes mostly a copy.
+- **Lower `--max-entry-mb`** (default **64**) if you don’t need huge files. Large members are skipped completely (saves time and memory; you lose that data).
+- **Build for your CPU:** `RUSTFLAGS="-C target-cpu=native" cargo build --release`. Release already uses LTO with `codegen-units = 1`.
+- **Keep output small.** Avoid `--pretty` and `--show-parser-results` on full runs. Writing tens of megabytes of formatted JSON is surprisingly slow.
+- **Library use:** load the archive once (`Arc<SysdiagnoseArchive>`) and reuse it for several `run_parsers_concurrently` calls instead of reopening each time. Parser results are `Arc<Value>` so you can share them with analysers / Sigma without deep-cloning.
+
+### Code-side notes
+
+Already in this tree: faster gzip (`zlib-rs`), analysers run in parallel on the CLI, and parser JSON is shared via `Arc<Value>`.
+
+Still worth doing if you lean on SQLite / APOLLO parsers: open databases from memory (`sqlite3_deserialize`) on native instead of writing temp files, and give each parser its own connection so queries can run in parallel. After that, the wall clock is often the slowest single parser (e.g. `logarchive` with a high line limit)—decode `.tracev3` files on separate rayon tasks when you need that.
+
+### Benchmark vs Python SAF
+
+[`scripts/bench_vs_saf.sh`](scripts/bench_vs_saf.sh) times this crate’s release `sdx-cli` against upstream [SAF](https://github.com/EC-DIGIT-CSIRC/sysdiagnose) (`saf` / `sysdiag`) on the same archive and parser set.
+
+```bash
+# Install SAF once (venv), then:
+./scripts/bench_vs_saf.sh -i path/to/sysdiagnose.tar.gz --saf-dir /path/to/sysdiagnose --runs 3
+
+# Shared subset of parsers (faster)
+./scripts/bench_vs_saf.sh -i path/to/sysdiagnose.tar.gz --parsers ps,sys,crashlogs,remotectl_dumpstate
+
+# Include SAF create (extract) in the Python time
+./scripts/bench_vs_saf.sh -i path/to/sysdiagnose.tar.gz --e2e
+```
+
+By default it uses the **intersection** of parser IDs (so Rust-only modules like `knowledgec` / `apollo_all` are skipped), discards JSON output, and reports mean times plus **SAF / Rust** speedup. Pass `--saf-dir` (or install `saf` on `PATH` / set `SAF_DIR`).
 
 ## Tests
 

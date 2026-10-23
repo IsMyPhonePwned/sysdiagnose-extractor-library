@@ -61,15 +61,15 @@ fn all_analyser_types_matches_enum_iter() {
     from_iter.sort_by_key(|a| a.as_str());
     assert_eq!(from_fn, from_iter);
     let names: HashSet<_> = from_iter.iter().map(|a| a.as_str()).collect();
-    assert_eq!(names.len(), 14);
+    assert_eq!(names.len(), 15);
 }
 
 #[test]
 fn coverage_reflects_parsed_keys() {
     let arch = archive_with(&[]);
     let mut parsed: ParsedByParser = HashMap::new();
-    parsed.insert("ps".to_string(), json!({"parser": "ps", "rows": []}));
-    parsed.insert("sys".to_string(), json!({"parser": "sys"}));
+    parsed.insert("ps".to_string(), Arc::new(json!({"parser": "ps", "rows": []})));
+    parsed.insert("sys".to_string(), Arc::new(json!({"parser": "sys"})));
     let v = analyser_for(AnalyserType::coverage)
         .analyse(&arch, &parsed)
         .expect("coverage");
@@ -83,27 +83,18 @@ fn coverage_reflects_parsed_keys() {
 fn ps_matrix_aligns_injected_ps_psthread_taskinfo() {
     let arch = archive_with(&[]);
     let mut parsed: ParsedByParser = HashMap::new();
-    parsed.insert(
-        "ps".to_string(),
-        json!({
+    parsed.insert("ps".to_string(), Arc::new(json!({
             "parser": "ps",
             "rows": [{"user": "root", "pid": 1, "command": "/sbin/launchd"}]
-        }),
-    );
-    parsed.insert(
-        "psthread".to_string(),
-        json!({
+        })));
+    parsed.insert("psthread".to_string(), Arc::new(json!({
             "parser": "psthread",
             "entries": [{"user": "root", "pid": 1, "command": "/sbin/launchd"}]
-        }),
-    );
-    parsed.insert(
-        "taskinfo".to_string(),
-        json!({
+        })));
+    parsed.insert("taskinfo".to_string(), Arc::new(json!({
             "parser": "taskinfo",
             "events": [{"data": {"pid": 1, "name": "/sbin/launchd"}}]
-        }),
-    );
+        })));
     let v = analyser_for(AnalyserType::ps_matrix)
         .analyse(&arch, &parsed)
         .expect("ps_matrix");
@@ -124,9 +115,7 @@ fn ps_matrix_aligns_injected_ps_psthread_taskinfo() {
 fn timesketch_includes_shutdown_event_with_datetime() {
     let arch = archive_with(&[]);
     let mut parsed: ParsedByParser = HashMap::new();
-    parsed.insert(
-        "shutdownlogs".to_string(),
-        json!({
+    parsed.insert("shutdownlogs".to_string(), Arc::new(json!({
             "parser": "shutdownlogs",
             "events": [{
                 "datetime": "2020-01-02T03:04:05+00:00",
@@ -134,8 +123,7 @@ fn timesketch_includes_shutdown_event_with_datetime() {
                 "timestamp_desc": "process running at shutdown",
                 "data": { "pid": 42, "command": "foo" }
             }]
-        }),
-    );
+        })));
     let v = analyser_for(AnalyserType::timesketch)
         .analyse(&arch, &parsed)
         .expect("timesketch");
@@ -170,13 +158,10 @@ fn timesketch_includes_shutdown_event_with_datetime() {
 fn ps_everywhere_picks_up_injected_ps_rows() {
     let arch = archive_with(&[]);
     let mut parsed: ParsedByParser = HashMap::new();
-    parsed.insert(
-        "ps".to_string(),
-        json!({
+    parsed.insert("ps".to_string(), Arc::new(json!({
             "parser": "ps",
             "rows": [{"user": "root", "pid": 1, "command": "/usr/libexec/foo --bar"}]
-        }),
-    );
+        })));
     let v = analyser_for(AnalyserType::ps_everywhere)
         .analyse(&arch, &parsed)
         .expect("ps_everywhere");
@@ -198,9 +183,7 @@ fn ps_everywhere_picks_up_injected_ps_rows() {
 fn ps_everywhere_merges_taskinfo_and_spindump_fields_by_pid() {
     let arch = archive_with(&[]);
     let mut parsed: ParsedByParser = HashMap::new();
-    parsed.insert(
-        "ps".to_string(),
-        json!({
+    parsed.insert("ps".to_string(), Arc::new(json!({
             "parser": "ps",
             "rows": [{
                 "user": "root",
@@ -209,11 +192,8 @@ fn ps_everywhere_merges_taskinfo_and_spindump_fields_by_pid() {
                 "ppid": 1,
                 "command": "sshd: root@ttys000"
             }]
-        }),
-    );
-    parsed.insert(
-        "taskinfo".to_string(),
-        json!({
+        })));
+    parsed.insert("taskinfo".to_string(), Arc::new(json!({
             "parser": "taskinfo",
             "events": [{
                 "datetime": "2023-05-24T20:27:46Z",
@@ -227,11 +207,8 @@ fn ps_everywhere_merges_taskinfo_and_spindump_fields_by_pid() {
                     "threads": [{"thread ID": "0x1"}]
                 }
             }]
-        }),
-    );
-    parsed.insert(
-        "spindumpnosymbols".to_string(),
-        json!({
+        })));
+    parsed.insert("spindumpnosymbols".to_string(), Arc::new(json!({
             "parser": "spindumpnosymbols",
             "format": "jsonl",
             "events": [{
@@ -249,8 +226,7 @@ fn ps_everywhere_merges_taskinfo_and_spindump_fields_by_pid() {
                     "threads": [{"thread": "0x11a9"}]
                 }
             }]
-        }),
-    );
+        })));
 
     let v = analyser_for(AnalyserType::ps_everywhere)
         .analyse(&arch, &parsed)
@@ -276,20 +252,15 @@ fn ps_everywhere_merges_taskinfo_and_spindump_fields_by_pid() {
 fn ps_everywhere_backfills_args_onto_taskinfo_by_path() {
     let arch = archive_with(&[]);
     let mut parsed: ParsedByParser = HashMap::new();
-    parsed.insert(
-        "ps".to_string(),
-        json!({
+    parsed.insert("ps".to_string(), Arc::new(json!({
             "parser": "ps",
             "rows": [{
                 "user": "mobile",
                 "pid": 461,
                 "command": "/var/containers/Bundle/Application/4B6E715E-641B-4F43-B39B-CA9AE3E8B73B/Signal.app/mussel dGNwOi8vOTguNjYuMTU0LjIzNToyOTU1Mg=="
             }]
-        }),
-    );
-    parsed.insert(
-        "taskinfo".to_string(),
-        json!({
+        })));
+    parsed.insert("taskinfo".to_string(), Arc::new(json!({
             "parser": "taskinfo",
             "format": "jsonl",
             "events": [{
@@ -305,8 +276,7 @@ fn ps_everywhere_backfills_args_onto_taskinfo_by_path() {
                     "parent": "launchd"
                 }
             }]
-        }),
-    );
+        })));
 
     let v = analyser_for(AnalyserType::ps_everywhere)
         .analyse(&arch, &parsed)
@@ -333,9 +303,7 @@ fn ps_everywhere_backfills_args_onto_taskinfo_by_path() {
 fn ps_everywhere_backfills_parent_name_from_ppid() {
     let arch = archive_with(&[]);
     let mut parsed: ParsedByParser = HashMap::new();
-    parsed.insert(
-        "ps".to_string(),
-        json!({
+    parsed.insert("ps".to_string(), Arc::new(json!({
             "parser": "ps",
             "rows": [
                 {
@@ -350,8 +318,7 @@ fn ps_everywhere_backfills_parent_name_from_ppid() {
                     "command": "/usr/bin/zsh"
                 }
             ]
-        }),
-    );
+        })));
 
     let v = analyser_for(AnalyserType::ps_everywhere)
         .analyse(&arch, &parsed)
@@ -426,20 +393,15 @@ fn summary_returns_markdown_content() {
 fn summary_security_and_shutdown_insights_with_parsed_stub() {
     let arch = archive_with(&[]);
     let mut parsed: ParsedByParser = HashMap::new();
-    parsed.insert(
-        "security_sysdiagnose".to_string(),
-        json!({
+    parsed.insert("security_sysdiagnose".to_string(), Arc::new(json!({
             "parser": "security_sysdiagnose",
             "format": "jsonl",
             "events": [{
                 "message": "Keychain access sample event",
                 "data": { "section": "genp", "attributes": {} }
             }]
-        }),
-    );
-    parsed.insert(
-        "shutdownlogs".to_string(),
-        json!({
+        })));
+    parsed.insert("shutdownlogs".to_string(), Arc::new(json!({
             "parser": "shutdownlogs",
             "events": [{
                 "datetime": "2021-05-06T12:00:00+00:00",
@@ -451,8 +413,7 @@ fn summary_security_and_shutdown_insights_with_parsed_stub() {
                     "uuid": "U1"
                 }
             }]
-        }),
-    );
+        })));
     let v = analyser_for(AnalyserType::summary)
         .analyse(&arch, &parsed)
         .expect("summary");

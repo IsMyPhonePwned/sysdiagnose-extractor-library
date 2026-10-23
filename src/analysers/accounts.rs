@@ -395,13 +395,12 @@ mod tests {
     use super::*;
     use crate::SysdiagnoseArchive;
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     #[test]
     fn extracts_mobilecal_and_transparency_identity() {
         let mut parsed = ParsedByParser::new();
-        parsed.insert(
-            "plists".into(),
-            json!({
+        parsed.insert("plists".into(), Arc::new(json!({
                 "files": {
                     "logs/Preferences/mobilecal.plist": {
                         "OwnerEmailAddress": ["alice@icloud.com", "work@example.com"]
@@ -410,11 +409,8 @@ mod tests {
                         "restrictedBool": { "allowLockdownMode": { "value": true } }
                     }
                 }
-            }),
-        );
-        parsed.insert(
-            "transparency_json".into(),
-            json!({
+            })));
+        parsed.insert("transparency_json".into(), Arc::new(json!({
                 "stateMachine": {
                     "selfVerification": {
                         "server": {
@@ -435,8 +431,7 @@ mod tests {
                         "im://tel:+15551212"
                     ]
                 }
-            }),
-        );
+            })));
 
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let v = run(&parsed, &arch);

@@ -1,7 +1,7 @@
 //! Collect IPv4 addresses, hostnames, URLs, and Wi‑Fi SSIDs from parser JSON (network hunting).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use regex::Regex;
 use serde_json::{json, Value};
@@ -393,9 +393,7 @@ mod tests {
     #[test]
     fn extracts_ipv4_domain_and_url_from_event_data() {
         let mut parsed: ParsedByParser = HashMap::new();
-        parsed.insert(
-            "powerlogs".into(),
-            json!({
+        parsed.insert("powerlogs".into(), Arc::new(json!({
                 "parser": "powerlogs",
                 "events": [{
                     "data": {
@@ -403,20 +401,13 @@ mod tests {
                         "serverhostname": "push.apple.com"
                     }
                 }]
-            }),
-        );
-        parsed.insert(
-            "swcutil".into(),
-            json!({
+            })));
+        parsed.insert("swcutil".into(), Arc::new(json!({
                 "events": [{ "data": { "domain": "example.org" } }]
-            }),
-        );
-        parsed.insert(
-            "safari_history".into(),
-            json!({
+            })));
+        parsed.insert("safari_history".into(), Arc::new(json!({
                 "events": [{ "data": { "url": "https://news.example.com/article" } }]
-            }),
-        );
+            })));
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let v = run(&parsed, &arch);
         assert!(v["ipv4"].as_array().unwrap().iter().any(|x| x == "203.0.113.10"));
@@ -432,9 +423,7 @@ mod tests {
     #[test]
     fn extracts_crashlogs_ips_and_quarantine_urls() {
         let mut parsed: ParsedByParser = HashMap::new();
-        parsed.insert(
-            "crashlogs".into(),
-            json!({
+        parsed.insert("crashlogs".into(), Arc::new(json!({
                 "parser": "crashlogs",
                 "events": [{
                     "data": {
@@ -442,19 +431,15 @@ mod tests {
                         "url": "https://cdn.example.net/pkg"
                     }
                 }]
-            }),
-        );
-        parsed.insert(
-            "quarantine_events".into(),
-            json!({
+            })));
+        parsed.insert("quarantine_events".into(), Arc::new(json!({
                 "events": [{
                     "data": {
                         "origin url string": "https://download.example.org/file.zip",
                         "data url string": "file:///Users/me/Downloads/file.zip"
                     }
                 }]
-            }),
-        );
+            })));
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let v = run(&parsed, &arch);
         assert!(v["ipv4"].as_array().unwrap().iter().any(|x| x == "198.51.100.5"));
@@ -465,17 +450,14 @@ mod tests {
     #[test]
     fn extracts_wifi_ssid_from_access_point_field() {
         let mut parsed: ParsedByParser = HashMap::new();
-        parsed.insert(
-            "wifi_known_networks".into(),
-            json!({
+        parsed.insert("wifi_known_networks".into(), Arc::new(json!({
                 "events": [{
                     "data": {
                         "ssid": "CorpWiFi",
                         "access point": "Guest-5G"
                     }
                 }]
-            }),
-        );
+            })));
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let v = run(&parsed, &arch);
         let ssids = v["ssids"].as_array().unwrap();
@@ -486,17 +468,14 @@ mod tests {
     #[test]
     fn scans_decoded_logarchive_events_when_present() {
         let mut parsed: ParsedByParser = HashMap::new();
-        parsed.insert(
-            "logarchive".into(),
-            json!({
+        parsed.insert("logarchive".into(), Arc::new(json!({
                 "parser": "logarchive",
                 "decode": "success",
                 "events": [{
                     "message": "tcp connect 203.0.113.44:443",
                     "data": { "eventMessage": "tcp connect 203.0.113.44:443" }
                 }]
-            }),
-        );
+            })));
         let arch = SysdiagnoseArchive::from_files_for_test(HashMap::new());
         let v = run(&parsed, &arch);
         assert!(v["ipv4"].as_array().unwrap().iter().any(|x| x == "203.0.113.44"));

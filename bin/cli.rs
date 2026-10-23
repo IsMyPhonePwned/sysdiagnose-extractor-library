@@ -1,6 +1,7 @@
 //! CLI for SAF-aligned parsers (`sysdiag parse` spirit) and analyser listing.
 
 use clap::{Parser, Subcommand};
+use rayon::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 use sigma_zero::engine::SigmaEngine;
 use std::collections::HashMap;
@@ -145,7 +146,7 @@ fn print_parse_json_to_stdout(args: &ParseArgs) -> bool {
 fn print_parser_performance(
     results: &[(
         ParserType,
-        Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>>,
+        Result<Arc<serde_json::Value>, Box<dyn std::error::Error + Send + Sync>>,
         Duration,
     )],
 ) {
@@ -227,11 +228,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let duration_ms = dur.as_secs_f64() * 1000.0;
                 match res {
                     Ok(v) => {
-                        parsed_by_parser.insert(key.clone(), v.clone());
+                        // Share JSON with analysers / Sigma; one deep clone only for the output map.
+                        parsed_by_parser.insert(key.clone(), Arc::clone(v));
                         let mut obj = serde_json::Map::new();
                         obj.insert("ok".to_string(), serde_json::json!(true));
                         obj.insert("duration_ms".to_string(), serde_json::json!(duration_ms));
-                        obj.insert("data".to_string(), v.clone());
+                        obj.insert("data".to_string(), (**v).clone());
                         out.insert(key, serde_json::Value::Object(obj));
                     }
                     Err(e) => {
@@ -249,20 +251,21 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }
 
             if let Some(analyser_list) = resolve_analysers_to_run(&args)? {
+                let an_rows: Vec<_> = analyser_list
+                    .into_par_iter()
+                    .map(|a| {
+                        let name = a.as_str().to_string();
+                        let value = match analyser_for(a).analyse(archive.as_ref(), &parsed_by_parser)
+                        {
+                            Ok(v) => v,
+                            Err(e) => serde_json::json!({ "error": e.to_string() }),
+                        };
+                        (name, value)
+                    })
+                    .collect();
                 let mut an = serde_json::Map::new();
-                for a in analyser_list {
-                    match analyser_for(a).analyse(archive.as_ref(), &parsed_by_parser) {
-                        Ok(v) => {
-                            an.insert(a.as_str().to_string(), v);
-                        }
-                        Err(e) => {
-                            let err_msg: String = e.to_string();
-                            an.insert(
-                                a.as_str().to_string(),
-                                serde_json::json!({ "error": err_msg }),
-                            );
-                        }
-                    }
+                for (name, value) in an_rows {
+                    an.insert(name, value);
                 }
                 out.insert("_analysers".to_string(), serde_json::Value::Object(an));
             }
@@ -283,22 +286,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     tracing::info!(rules = n, path = %rules_dir.display(), "Loaded Sigma rules");
                     println!("Loaded {n} rule(s).\n");
 
-                    let results_for_sigma: Vec<_> = results
-                        .iter()
-                        .map(|(pt, res, dur)| {
-                            let r = match res {
-                                Ok(v) => Ok(v.clone()),
-                                Err(e) => Err(Box::new(std::io::Error::new(
-                                    std::io::ErrorKind::Other,
-                                    e.to_string(),
-                                ))
-                                    as Box<dyn Error + Send + Sync>),
-                            };
-                            (*pt, r, *dur)
-                        })
-                        .collect();
-
-                    let all_entries = sigma::extract_all_log_entries(&results_for_sigma);
+                    let all_entries = sigma::extract_all_log_entries(&results);
                     let mut stats = SigmaStats::new();
                     stats.total_logs_evaluated =
                         all_entries.iter().map(|(_, entries)| entries.len()).sum();
