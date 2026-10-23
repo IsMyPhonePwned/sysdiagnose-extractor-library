@@ -1,6 +1,8 @@
 # sysdiagnose-extractor-library
 
-Rust library and CLI to load Apple **sysdiagnose** archives (typically `sysdiagnose_*.tar.gz`) and run the same **parser modules** as the Python **Sysdiagnose Analysis Framework (SAF)** from **[EC-DIGIT-CSIRC/sysdiagnose](https://github.com/EC-DIGIT-CSIRC/sysdiagnose)**. The workflow mirrors **[bugreport-extractor-library](https://github.com/ping2A/bugreport-extractor-library)**: load the bundle once, then run parsers in parallel.
+**This project is based on [EC-DIGIT-CSIRC/sysdiagnose](https://github.com/EC-DIGIT-CSIRC/sysdiagnose)** (the Sysdiagnose Analysis Framework / SAF), developed by the European Commission DIGIT Cybersecurity Operation Centre. It is a Rust reimplementation of SAF’s parser and analyser modules for Apple sysdiagnose archives—not a fork of the Python tree, but deliberately aligned with that upstream project’s IDs, inputs, and output shapes.
+
+Rust library and CLI to load Apple **sysdiagnose** archives (typically `sysdiagnose_*.tar.gz`) and run the same **parser modules** as the Python SAF. The workflow mirrors **[bugreport-extractor-library](https://github.com/ping2A/bugreport-extractor-library)**: load the bundle once, then run parsers in parallel.
 
 ## Requirements
 
@@ -418,6 +420,12 @@ cd testdata/sysdiagnose-testdata && git checkout 7e64d5ca133837393c0c7cd3193d0d4
 cargo test --test sysdiagnose_testdata -- --nocapture
 ```
 
+## Attribution
+
+This software is **explicitly based on** the [Sysdiagnose Analysis Framework (SAF)](https://github.com/EC-DIGIT-CSIRC/sysdiagnose) by **EC-DIGIT-CSIRC** (European Commission). Parser and analyser behaviour is ported or adapted from that project under the same licence. Upstream copyright and contributors remain those of SAF; see also [NOTICE](NOTICE).
+
 ## License
 
-See [LICENSE](LICENSE) in this repository.
+Licensed under the **European Union Public Licence v. 1.2 (EUPL-1.2)**—the same licence as [EC-DIGIT-CSIRC/sysdiagnose](https://github.com/EC-DIGIT-CSIRC/sysdiagnose).
+
+See [LICENSE](LICENSE) for the full text, or <https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12>.

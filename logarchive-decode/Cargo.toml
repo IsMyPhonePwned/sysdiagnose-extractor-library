@@ -3,7 +3,7 @@ name = "sysdiagnose_logarchive_decode"
 version = "0.1.0"
 edition = "2021"
 description = "Unified-log decode for iOS sysdiagnose logarchive bundles (macos-unifiedlogs)"
-license-file = "../LICENSE"
+license = "EUPL-1.2"
 publish = false
 
 [dependencies]

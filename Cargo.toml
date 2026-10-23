@@ -7,7 +7,7 @@ name = "sysdiagnose_extractor_library"
 version = "0.1.0"
 edition = "2021"
 description = "Parse Apple iOS sysdiagnose archives (.tar.gz / .tar.xz) into structured JSON"
-license-file = "LICENSE"
+license = "EUPL-1.2"
 include = [
     "src/**/*",
     "logarchive-decode/**/*",
@@ -16,6 +16,7 @@ include = [
     "Cargo.toml",
     "README.md",
     "LICENSE",
+    "NOTICE",
 ]
 
 [lib]

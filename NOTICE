@@ -1,0 +1,28 @@
+sysdiagnose-extractor-library
+========================================================================================
+
+This project is based on the Sysdiagnose Analysis Framework (SAF):
+
+  https://github.com/EC-DIGIT-CSIRC/sysdiagnose
+
+Copyright (C) 2023-2026 European Union
+Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the
+European Commission - subsequent versions of the EUPL (the "Licence");
+You may not use this work except in compliance with the Licence.
+
+You may obtain a copy of the Licence at:
+  https://joinup.ec.europa.eu/software/page/eupl
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the Licence is distributed on an "AS IS" basis, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the Licence for the
+specific language governing permissions and limitations under the Licence.
+
+SAF was developed by EC-DIGIT-CSIRC (European Commission DIGIT Cybersecurity
+Operation Centre). This repository is a Rust port / reimplementation of SAF
+parser and analyser modules for Apple sysdiagnose archives, released under the
+same EUPL-1.2 licence.
+
+For third-party notices included with upstream SAF (e.g. APOLLO modules), see:
+  https://github.com/EC-DIGIT-CSIRC/sysdiagnose/blob/main/NOTICE.txt
+========================================================================================
